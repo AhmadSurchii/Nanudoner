@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -99,8 +99,9 @@
   .qty-minus { background: var(--surface3); color: var(--text); }
   .qty-plus { background: var(--maroon); color: white; }
   .qty-num { font-size: 0.95rem; font-weight: 700; min-width: 22px; text-align: center; }
-  .ci-remove { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; padding: 4px; border-radius: 4px; -webkit-tap-highlight-color: transparent; }
-  .ci-remove:active { color: var(--danger); }
+  /* NEW: BIGGER DELETE BUTTON FOR IPAD */
+  .ci-remove { background: rgba(198, 40, 40, 0.2); border: none; color: var(--danger); cursor: pointer; font-size: 1.5rem; padding: 15px 25px; border-radius: var(--radius-sm); margin-left: 10px; -webkit-tap-highlight-color: transparent; }
+  .ci-remove:active { color: #ff5252; background: rgba(198, 40, 40, 0.4); }
 
   #cart-footer { padding: 12px; border-top: 1px solid var(--surface3); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; background: var(--surface); }
   .total-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
@@ -252,7 +253,6 @@
 </head>
 <body>
 
-<!-- HEADER -->
 <div id="app-header">
   <div class="brand-container">
     <img id="header-logo" alt="Logo" class="brand-logo" style="display:none;">
@@ -267,7 +267,6 @@
   </div>
 </div>
 
-<!-- MAIN LAYOUT -->
 <div id="layout">
   <div id="menu-panel">
     <div id="category-bar">
@@ -311,7 +310,6 @@
   </div>
 </div>
 
-<!-- RECEIPT MODAL -->
 <div class="modal-overlay" id="receipt-modal">
   <div class="modal">
     <div class="modal-header">
@@ -326,7 +324,6 @@
   </div>
 </div>
 
-<!-- ADMIN MODAL -->
 <div class="modal-overlay" id="admin-modal">
   <div class="modal" style="max-width:520px;">
     <div class="modal-header">
@@ -341,7 +338,6 @@
         <button class="admin-tab" onclick="App.adminTab('settings', this)">Settings</button>
       </div>
       
-      <!-- Add/Edit Panel -->
       <div class="admin-panel active" id="panel-add">
         <input type="hidden" id="edit-id">
         <div class="form-group"><label>Item Name *</label><input type="text" id="item-name" autocomplete="off"></div>
@@ -360,12 +356,10 @@
         <button class="btn-primary" id="cancel-edit-btn" style="display:none;background:var(--surface3);" onclick="App.cancelEdit()">Cancel Edit</button>
       </div>
       
-      <!-- Manage Items Panel -->
       <div class="admin-panel" id="panel-items">
         <div id="admin-items-list"></div>
       </div>
       
-      <!-- Categories Panel -->
       <div class="admin-panel" id="panel-cats">
         <div class="form-group">
           <label>Add Category</label>
@@ -377,7 +371,6 @@
         <div id="cat-chips-list" class="category-chips"></div>
       </div>
 
-      <!-- Settings Panel (Logo Upload) -->
       <div class="admin-panel" id="panel-settings">
         <div class="form-group">
           <label>Store Logo</label>
@@ -394,7 +387,6 @@
   </div>
 </div>
 
-<!-- SALES MODAL -->
 <div class="modal-overlay" id="sales-modal">
   <div class="modal" style="max-width:520px;">
     <div class="modal-header">
@@ -410,7 +402,6 @@
   </div>
 </div>
 
-<!-- EXPENSES MODAL -->
 <div class="modal-overlay" id="expenses-modal">
   <div class="modal" style="max-width:520px;">
     <div class="modal-header">
@@ -419,7 +410,6 @@
     </div>
     <div class="modal-body">
       
-      <!-- Expense Form -->
       <div style="background:var(--surface2); padding:14px; border-radius:var(--radius-sm); margin-bottom:16px;">
         <div style="font-weight:bold; margin-bottom:10px; color:var(--purple);" id="exp-form-title">Add New Expense</div>
         <input type="hidden" id="exp-id">
@@ -476,7 +466,6 @@
         </div>
       </div>
 
-      <!-- Filters & List -->
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div style="font-weight:bold;">Expense History</div>
         <div style="font-weight:bold; color:var(--danger);" id="exp-total-display">Total: 0 IQD</div>
@@ -507,7 +496,6 @@
   </div>
 </div>
 
-<!-- CALENDAR / REPORTS MODAL -->
 <div class="modal-overlay" id="calendar-modal">
   <div class="modal" style="max-width:600px;">
     <div class="modal-header">
@@ -548,9 +536,9 @@
 
 <div id="toast"></div>
 
-<!-- FIREBASE LIBRARIES -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
 var App = (function() {
@@ -721,7 +709,9 @@ const firebaseConfig = {
   function renderMenu() {
     var grid = document.getElementById('menu-grid');
     var q = state.searchQuery.toLowerCase();
-    var filtered = state.menu.filter(function(i) {
+    
+    // Sort items so they appear in dragged order on the main menu too!
+    var filtered = state.menu.slice().sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)).filter(function(i) {
       return (state.activeCategory === 'All' || i.category === state.activeCategory) && (!q || i.name.toLowerCase().indexOf(q) !== -1);
     });
 
@@ -1051,16 +1041,43 @@ const firebaseConfig = {
     renderCart(); showToast('Item deleted');
   }
 
+    /* NEW DRAG AND DROP ADMIN LIST */
   function renderAdminItems() {
     var list = document.getElementById('admin-items-list');
     if (!list) return;
     if (state.menu.length === 0) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">No items yet</div>'; return; }
-    list.innerHTML = state.menu.map(function(item) {
+    
+    // Sort items by sortOrder
+    var sortedMenu = state.menu.slice().sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+
+    list.innerHTML = sortedMenu.map(function(item) {
       var imgHtml = item.img ? '<img class="item-row-img" src="' + esc(item.img) + '">' : '<div class="item-row-img-placeholder">' + (item.emoji || '🍽️') + '</div>';
-      return '<div class="item-row">' + imgHtml + '<div class="item-row-info"><div class="item-row-name">' + esc(item.name) + '</div><div class="item-row-meta">' + esc(item.category) + ' · ' + fmt(item.price) + '</div></div>'
+      return '<div class="item-row" data-id="' + item.id + '" style="cursor:grab;">' 
+        + '<div style="font-size:1.5rem; margin-right:12px; color:var(--text-dim);">≡</div>'
+        + imgHtml + '<div class="item-row-info" style="margin-left:10px;"><div class="item-row-name">' + esc(item.name) + '</div><div class="item-row-meta">' + esc(item.category) + ' · ' + fmt(item.price) + '</div></div>'
         + '<div class="item-row-actions"><button class="btn-edit" onclick="App.editItem(\'' + item.id + '\')">Edit</button><button class="btn-delete" onclick="App.deleteItem(\'' + item.id + '\')">Delete</button></div></div>';
     }).join('');
+
+    new Sortable(list, {
+      animation: 150,
+      onEnd: function (evt) {
+        // Use a Firebase Batch to update everything securely at once
+        var batch = db.batch(); 
+        var items = list.querySelectorAll('.item-row');
+        
+        items.forEach(function(el, index) {
+          var id = el.getAttribute('data-id');
+          var ref = db.collection('menu').doc(id);
+          batch.set(ref, { sortOrder: index }, { merge: true });
+        });
+        
+        batch.commit().then(function() {
+          showToast("Menu order saved!");
+        });
+      }
+    });
   }
+
 
   function addCategory() {
     var input = document.getElementById('new-cat-input');
