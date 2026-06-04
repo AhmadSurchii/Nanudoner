@@ -529,9 +529,11 @@
           <div class="row"><span>Net Profit:</span> <span class="val" id="det-net">0 IQD</span></div>
           <div class="row"><span>Number of Orders:</span> <span class="val" id="det-orders">0</span></div>
         </div>
-        <div class="best-sellers" id="det-best-sellers"></div>
+              <div class="best-sellers" id="det-best-sellers"></div>
         <div class="best-sellers" id="det-exp-list" style="margin-top:12px;"></div>
+        <div id="det-actions" style="margin-top:16px; display:flex; gap:8px;"></div>
       </div>
+
     </div>
   </div>
 </div>
@@ -545,7 +547,6 @@
 var App = (function() {
   'use strict';
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyArExP2R92vp8DalU9C7SDylAXB9a1UjLQ",
   authDomain: "nan-u-doner-pos.firebaseapp.com",
@@ -586,20 +587,18 @@ const firebaseConfig = {
     { id: 'extra-nan',     name: 'Extra Nan',     price:  350, category: 'Extras', img: '', emoji: '🫓' }
   ];
 
-  // We keep LocalStorage ONLY for the logo to avoid Base64 size limits on Firebase documents.
   function lsGet(key, fallback) {
     try { var raw = localStorage.getItem(key); return raw === null ? fallback : JSON.parse(raw); } 
     catch (e) { return fallback; }
   }
   function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
 
-  function loadData() {
-    state.logo = lsGet('pos_logo', null);
+    function loadData() {
+    state.logo = 'logo.png';
 
-    // 1. Listen for Menu updates in real-time
+
     db.collection('menu').onSnapshot(function(snapshot) {
       if(snapshot.empty && state.menu.length === 0) {
-        // Seed default menu into Firebase if it's completely empty
         DEFAULT_MENU.forEach(function(item) {
           db.collection('menu').doc(item.id).set(item);
         });
@@ -621,7 +620,6 @@ const firebaseConfig = {
       }
     });
 
-    // 2. Listen for Categories
     db.collection('settings').doc('categories').onSnapshot(function(doc) {
       if(doc.exists && doc.data().list) {
         state.categories = doc.data().list;
@@ -631,7 +629,6 @@ const firebaseConfig = {
       populateCategorySelect();
     });
 
-    // 3. Listen for Sales
     db.collection('sales').orderBy('timestamp', 'desc').onSnapshot(function(snapshot) {
       state.sales = [];
       snapshot.forEach(function(doc) {
@@ -642,7 +639,6 @@ const firebaseConfig = {
       }
     });
 
-    // 4. Listen for Expenses
     db.collection('expenses').onSnapshot(function(snapshot) {
       state.expenses = [];
       snapshot.forEach(function(doc) {
@@ -669,7 +665,6 @@ const firebaseConfig = {
     return cats;
   }
 
-  /* ─── UI RENDERING ─── */
   function applyLogo() {
     var headerLogo = document.getElementById('header-logo');
     var previewLogo = document.getElementById('logo-preview');
@@ -735,7 +730,6 @@ const firebaseConfig = {
     }).join('');
   }
 
-  /* ─── CART AND CHECKOUT ─── */
   function addToCart(id) {
     var item = state.menu.find(function(m){ return m.id === id; });
     var existing = state.cart.find(function(c){ return c.id === id; });
@@ -795,7 +789,6 @@ const firebaseConfig = {
     var saleId = uid();
     var sale = { id: saleId, timestamp: Date.now(), items: JSON.parse(JSON.stringify(state.cart)), total: total, cash: cash, change: cash - total };
     
-    // Save to Firebase
     db.collection('sales').doc(saleId).set(sale);
     
     var itemsH = sale.items.map(function(i){ return '<div class="receipt-row"><span>'+esc(i.name)+' x'+i.qty+'</span><span>'+fmt(i.price*i.qty)+'</span></div>'; }).join('');
@@ -838,7 +831,6 @@ const firebaseConfig = {
     document.getElementById('cash-input').value = '';
   }
 
-  /* ─── SALES AND PRINT REPORT ─── */
   function openSales() {
     var today = new Date(); today.setHours(0,0,0,0);
     var todaySales = state.sales.filter(function(s){ return s.timestamp >= today.getTime(); });
@@ -901,7 +893,6 @@ const firebaseConfig = {
 
     var grandTotal = 0;
 
-    // Output sales in chronological order for report
     var chronologicalSales = state.sales.slice().sort((a,b) => a.timestamp - b.timestamp);
 
     chronologicalSales.forEach(function(s) {
@@ -928,7 +919,6 @@ const firebaseConfig = {
     setTimeout(function(){ win.print(); win.close(); }, 300);
   }
 
-  /* ─── ADMIN FUNCTIONS ─── */
   function openAdmin() {
     adminTab('add', document.querySelector('.admin-tab.active') || document.querySelector('.admin-tab'));
     renderAdminItems();
@@ -953,7 +943,6 @@ const firebaseConfig = {
     sel.innerHTML = getCategoriesFromMenu().map(function(c){ return '<option value="' + esc(c) + '">' + esc(c) + '</option>'; }).join('');
   }
 
-  // Handle Menu Item Image
   function handleImageUpload(input) {
     var file = input.files[0];
     if (!file) return;
@@ -968,7 +957,6 @@ const firebaseConfig = {
     reader.readAsDataURL(file);
   }
 
-  // Handle Main Store Logo
   function handleLogoUpload(input) {
     var file = input.files[0];
     if (!file) return;
@@ -1132,7 +1120,35 @@ const firebaseConfig = {
     }).join('');
   }
 
-  /* ─── EXPENSES MODAL ─── */
+  function openExpensesForDate(dateStr) {
+    closeModal('calendar-modal');
+    openExpenses();
+    document.getElementById('exp-date').value = dateStr;
+  }
+
+  function addManualSaleForDate(dateStr) {
+    var amtStr = prompt("Enter total amount for this missed sale (IQD):");
+    if (!amtStr) return;
+    var amt = parseFloat(amtStr);
+    if (isNaN(amt) || amt <= 0) { showToast("Invalid amount"); return; }
+    var note = prompt("Enter a description (e.g. 'Late cash order')") || "Manual Entry";
+
+    var d = new Date(dateStr);
+    d.setHours(12, 0, 0, 0);
+
+    var saleId = uid();
+    var sale = { 
+      id: saleId, timestamp: d.getTime(), 
+      items: [{ name: note, price: amt, qty: 1 }], 
+      total: amt, cash: amt, change: 0 
+    };
+
+    db.collection('sales').doc(saleId).set(sale);
+    showToast("Past sale added!");
+    
+    showDayDetails(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
   function openExpenses() {
     document.getElementById('exp-date').value = toYYYYMMDD(new Date());
     document.getElementById('filter-exp-date').value = toYYYYMMDD(new Date()); // Default filter to today
@@ -1221,7 +1237,6 @@ const firebaseConfig = {
     var list = document.getElementById('expenses-list');
     if(!filtered.length) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">No expenses match filters</div>'; return; }
     
-    // Sort descending by date, then id
     filtered.sort(function(a,b){ return a.date === b.date ? (a.id < b.id ? 1 : -1) : (a.date < b.date ? 1 : -1); });
 
     list.innerHTML = filtered.map(function(e) {
@@ -1232,11 +1247,10 @@ const firebaseConfig = {
     }).join('');
   }
 
-  /* ─── CALENDAR / REPORTS MODAL ─── */
   var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
   function openCalendar() {
-    state.calDate = new Date(); // Reset to current month
+    state.calDate = new Date(); 
     document.getElementById('cal-day-details').style.display = 'none';
     renderCalendar();
     openModal('calendar-modal');
@@ -1253,13 +1267,11 @@ const firebaseConfig = {
     var month = state.calDate.getMonth();
     document.getElementById('cal-month-year').textContent = months[month] + ' ' + year;
 
-    var firstDay = new Date(year, month, 1).getDay(); // 0 (Sun) to 6 (Sat)
+    var firstDay = new Date(year, month, 1).getDay(); 
     var daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    // Calculate month stats
     var monthSales = 0, monthExp = 0, monthOrders = 0;
     
-    // Pre-calculate daily data to color code
     var dailyData = {}; 
     for(var d=1; d<=daysInMonth; d++) dailyData[d] = { sales: 0, exp: 0, profit: 0, orders: 0 };
 
@@ -1275,7 +1287,7 @@ const firebaseConfig = {
     });
 
     state.expenses.forEach(function(e) {
-      var parts = e.date.split('-'); // YYYY-MM-DD
+      var parts = e.date.split('-'); 
       if(parts.length === 3 && parseInt(parts[0]) === year && parseInt(parts[1])-1 === month) {
         var day = parseInt(parts[2], 10);
         dailyData[day].exp += e.amount;
@@ -1283,9 +1295,7 @@ const firebaseConfig = {
       }
     });
 
-    // Populate Grid
     var grid = document.getElementById('cal-grid');
-    // Keep headers
     var headers = '<div class="cal-day-header">Sun</div><div class="cal-day-header">Mon</div><div class="cal-day-header">Tue</div><div class="cal-day-header">Wed</div><div class="cal-day-header">Thu</div><div class="cal-day-header">Fri</div><div class="cal-day-header">Sat</div>';
     var html = headers;
     
@@ -1299,7 +1309,6 @@ const firebaseConfig = {
     }
     grid.innerHTML = html;
 
-    // Monthly Summary Update
     var net = monthSales - monthExp;
     document.getElementById('cal-monthly-stats').innerHTML = 
       '<div class="stat-box"><div class="lbl">Monthly Sales</div><div class="val" style="color:var(--info)">'+fmt(monthSales)+'</div></div>' +
@@ -1339,14 +1348,15 @@ const firebaseConfig = {
     elNet.className = 'val ' + (net >= 0 ? 'profit-text' : 'loss-text');
     document.getElementById('det-orders').textContent = dayOrders;
 
-    // Best sellers html
     var bs = Object.keys(itemsMap).map(function(k){ return {name:k, qty:itemsMap[k]}; }).sort(function(a,b){return b.qty-a.qty;}).slice(0,5);
     var bsHtml = bs.length ? '<div class="best-sellers-title">Best Selling Items</div>' + bs.map(function(i){ return '<div class="best-seller-item"><span>'+esc(i.name)+'</span><b>x'+i.qty+'</b></div>'; }).join('') : '';
     document.getElementById('det-best-sellers').innerHTML = bsHtml;
 
-    // Expenses html
     var exHtml = dayExpArr.length ? '<div class="best-sellers-title">Expenses Breakdown</div>' + dayExpArr.map(function(e){ return '<div class="best-seller-item"><span>'+esc(e.category)+': '+esc(e.desc)+'</span><b style="color:var(--danger);">'+fmt(e.amount)+'</b></div>'; }).join('') : '<div class="best-sellers-title">No expenses this day.</div>';
     document.getElementById('det-exp-list').innerHTML = exHtml;
+    
+    document.getElementById('det-actions').innerHTML = '<button class="btn-primary" style="background:var(--success); font-size:0.85rem; padding:8px;" onclick="App.addManualSaleForDate(\''+dateStr+'\')">+ Add Missed Sale</button>'
+      + '<button class="btn-primary" style="background:var(--purple); font-size:0.85rem; padding:8px;" onclick="App.openExpensesForDate(\''+dateStr+'\')">+ Add Missed Expense</button>';
 
     document.getElementById('cal-day-details').style.display = 'block';
     document.getElementById('cal-day-details').scrollIntoView({behavior: 'smooth', block: 'nearest'});
@@ -1364,15 +1374,13 @@ const firebaseConfig = {
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-  // Make absolutely everything publicly available that HTML touches.
   return {
     filterCategory: filterCategory, searchMenu: searchMenu, addToCart: addToCart, changeQty: changeQty, removeFromCart: removeFromCart, clearCart: clearCart, updateChange: updateChange, checkout: checkout,
     printReceipt: printReceipt, newOrder: newOrder,
     openSales: openSales, clearSales: clearSales, deleteSale: deleteSale, printReport: printReport,
     openAdmin: openAdmin, adminTab: adminTab, handleImageUpload: handleImageUpload, handleLogoUpload: handleLogoUpload, clearLogo: clearLogo, saveItem: saveItem, cancelEdit: cancelEdit, deleteItem: deleteItem, moveItem: moveItem, saveMenuOrder: saveMenuOrder, editItem: editItem, addCategory: addCategory, deleteCategory: deleteCategory,
     openExpenses: openExpenses, saveExpense: saveExpense, editExpense: editExpense, deleteExpense: deleteExpense, cancelExpenseEdit: cancelExpenseEdit, renderExpenses: renderExpenses,
-    openCalendar: openCalendar, changeMonth: changeMonth, showDayDetails: showDayDetails,
-    closeModal: closeModal
+    openCalendar: openCalendar, changeMonth: changeMonth, showDayDetails: showDayDetails, openExpensesForDate: openExpensesForDate, addManualSaleForDate: addManualSaleForDate, closeModal: closeModal
   };
 })();
 </script>
