@@ -99,7 +99,8 @@
   .qty-minus { background: var(--surface3); color: var(--text); }
   .qty-plus { background: var(--maroon); color: white; }
   .qty-num { font-size: 0.95rem; font-weight: 700; min-width: 22px; text-align: center; }
-  /* NEW: BIGGER DELETE BUTTON FOR IPAD */
+  
+  /* ENLARGED DELETE BUTTON FOR IPAD */
   .ci-remove { background: rgba(198, 40, 40, 0.2); border: none; color: var(--danger); cursor: pointer; font-size: 1.5rem; padding: 15px 25px; border-radius: var(--radius-sm); margin-left: 10px; -webkit-tap-highlight-color: transparent; }
   .ci-remove:active { color: #ff5252; background: rgba(198, 40, 40, 0.4); }
 
@@ -357,6 +358,7 @@
       </div>
       
       <div class="admin-panel" id="panel-items">
+        <button class="btn-primary" onclick="App.saveMenuOrder()" style="margin-bottom:12px; background:var(--info);">💾 Save New Menu Order</button>
         <div id="admin-items-list"></div>
       </div>
       
@@ -538,7 +540,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <script>
 var App = (function() {
@@ -607,6 +608,13 @@ const firebaseConfig = {
         snapshot.forEach(function(doc) {
           state.menu.push(doc.data());
         });
+
+        state.menu.sort(function(a, b) {
+          var orderA = (typeof a.sortOrder === 'number') ? a.sortOrder : 999;
+          var orderB = (typeof b.sortOrder === 'number') ? b.sortOrder : 999;
+          return orderA - orderB;
+        });
+
         renderCategoryBar();
         renderMenu();
         renderAdminItems();
@@ -710,8 +718,7 @@ const firebaseConfig = {
     var grid = document.getElementById('menu-grid');
     var q = state.searchQuery.toLowerCase();
     
-    // Sort items so they appear in dragged order on the main menu too!
-    var filtered = state.menu.slice().sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)).filter(function(i) {
+    var filtered = state.menu.slice().sort(function(a,b) { return (a.sortOrder || 0) - (b.sortOrder || 0); }).filter(function(i) {
       return (state.activeCategory === 'All' || i.category === state.activeCategory) && (!q || i.name.toLowerCase().indexOf(q) !== -1);
     });
 
@@ -843,15 +850,25 @@ const firebaseConfig = {
       + '<div class="sales-stat"><span>All-time Sales</span><span class="val">' + state.sales.length + '</span></div>';
 
     var list = document.getElementById('sales-list');
-    var sorted = state.sales.slice(); // Already sorted descending by onSnapshot
+    var sorted = state.sales.slice(); 
     if (sorted.length === 0) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">No sales yet</div>'; } 
     else {
       list.innerHTML = sorted.slice(0, 50).map(function(s) {
         var itemSummary = s.items.map(function(i){ return i.name + ' x' + i.qty; }).join(', ');
-        return '<div class="sale-entry"><div class="sale-entry-top"><span class="sale-time">' + new Date(s.timestamp).toLocaleString() + '</span><span class="sale-amount">' + fmt(s.total) + '</span></div><div class="sale-items">' + esc(itemSummary) + '</div></div>';
+        return '<div class="sale-entry">'
+          + '<div class="sale-entry-top"><span class="sale-time">' + new Date(s.timestamp).toLocaleString() + '</span><span class="sale-amount">' + fmt(s.total) + '</span></div>'
+          + '<div class="sale-items">' + esc(itemSummary) + '</div>'
+          + '<div style="margin-top:8px; text-align:right;"><button class="btn-delete" style="padding:6px 12px; font-size:0.8rem;" onclick="App.deleteSale(\''+s.id+'\')">Delete Order</button></div>'
+          + '</div>';
       }).join('');
     }
     openModal('sales-modal');
+  }
+
+  function deleteSale(id) {
+    if (!confirm('Delete this order? This will remove it from your daily totals.')) return;
+    db.collection('sales').doc(id).delete();
+    showToast('Order deleted');
   }
 
   function clearSales() {
@@ -1041,43 +1058,55 @@ const firebaseConfig = {
     renderCart(); showToast('Item deleted');
   }
 
-    /* NEW DRAG AND DROP ADMIN LIST */
+  function moveItem(id, direction) {
+    state.menu.sort(function(a,b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
+    var idx = state.menu.findIndex(function(m){ return m.id === id; });
+    if (idx < 0) return;
+    if (direction === 'up' && idx > 0) {
+      var temp = state.menu[idx];
+      state.menu[idx] = state.menu[idx - 1];
+      state.menu[idx - 1] = temp;
+    } else if (direction === 'down' && idx < state.menu.length - 1) {
+      var temp = state.menu[idx];
+      state.menu[idx] = state.menu[idx + 1];
+      state.menu[idx + 1] = temp;
+    }
+    state.menu.forEach(function(m, i) { m.sortOrder = i; });
+    renderAdminItems();
+    renderMenu(); 
+  }
+
   function renderAdminItems() {
     var list = document.getElementById('admin-items-list');
     if (!list) return;
     if (state.menu.length === 0) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim);">No items yet</div>'; return; }
     
-    // Sort items by sortOrder
-    var sortedMenu = state.menu.slice().sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    var sortedMenu = state.menu.slice().sort(function(a,b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
 
     list.innerHTML = sortedMenu.map(function(item) {
       var imgHtml = item.img ? '<img class="item-row-img" src="' + esc(item.img) + '">' : '<div class="item-row-img-placeholder">' + (item.emoji || '🍽️') + '</div>';
-      return '<div class="item-row" data-id="' + item.id + '" style="cursor:grab;">' 
-        + '<div style="font-size:1.5rem; margin-right:12px; color:var(--text-dim);">≡</div>'
+      return '<div class="item-row" data-id="' + item.id + '">' 
         + imgHtml + '<div class="item-row-info" style="margin-left:10px;"><div class="item-row-name">' + esc(item.name) + '</div><div class="item-row-meta">' + esc(item.category) + ' · ' + fmt(item.price) + '</div></div>'
-        + '<div class="item-row-actions"><button class="btn-edit" onclick="App.editItem(\'' + item.id + '\')">Edit</button><button class="btn-delete" onclick="App.deleteItem(\'' + item.id + '\')">Delete</button></div></div>';
+        + '<div class="item-row-actions">'
+        + '<button class="btn-edit" style="background:var(--surface3); font-size:1.1rem; padding:4px 10px;" onclick="App.moveItem(\'' + item.id + '\', \'up\')">▲</button>'
+        + '<button class="btn-edit" style="background:var(--surface3); font-size:1.1rem; padding:4px 10px; margin-right:8px;" onclick="App.moveItem(\'' + item.id + '\', \'down\')">▼</button>'
+        + '<button class="btn-edit" onclick="App.editItem(\'' + item.id + '\')">Edit</button>'
+        + '<button class="btn-delete" onclick="App.deleteItem(\'' + item.id + '\')">Delete</button></div></div>';
     }).join('');
-
-    new Sortable(list, {
-      animation: 150,
-      onEnd: function (evt) {
-        // Use a Firebase Batch to update everything securely at once
-        var batch = db.batch(); 
-        var items = list.querySelectorAll('.item-row');
-        
-        items.forEach(function(el, index) {
-          var id = el.getAttribute('data-id');
-          var ref = db.collection('menu').doc(id);
-          batch.set(ref, { sortOrder: index }, { merge: true });
-        });
-        
-        batch.commit().then(function() {
-          showToast("Menu order saved!");
-        });
-      }
-    });
   }
 
+  function saveMenuOrder() {
+    var batch = db.batch();
+    state.menu.forEach(function(item) {
+      var ref = db.collection('menu').doc(item.id);
+      batch.set(ref, { sortOrder: item.sortOrder || 0 }, { merge: true });
+    });
+    batch.commit().then(function() { 
+      showToast("Menu order saved successfully!"); 
+    }).catch(function() {
+      showToast("Error saving order");
+    });
+  }
 
   function addCategory() {
     var input = document.getElementById('new-cat-input');
@@ -1102,7 +1131,6 @@ const firebaseConfig = {
       return '<div class="cat-chip">' + esc(cat) + '<span class="del" onclick="App.deleteCategory(\'' + esc(cat) + '\')">×</span></div>';
     }).join('');
   }
-
 
   /* ─── EXPENSES MODAL ─── */
   function openExpenses() {
@@ -1340,8 +1368,8 @@ const firebaseConfig = {
   return {
     filterCategory: filterCategory, searchMenu: searchMenu, addToCart: addToCart, changeQty: changeQty, removeFromCart: removeFromCart, clearCart: clearCart, updateChange: updateChange, checkout: checkout,
     printReceipt: printReceipt, newOrder: newOrder,
-    openSales: openSales, clearSales: clearSales, printReport: printReport,
-    openAdmin: openAdmin, adminTab: adminTab, handleImageUpload: handleImageUpload, handleLogoUpload: handleLogoUpload, clearLogo: clearLogo, saveItem: saveItem, cancelEdit: cancelEdit, deleteItem: deleteItem, editItem: editItem, addCategory: addCategory, deleteCategory: deleteCategory,
+    openSales: openSales, clearSales: clearSales, deleteSale: deleteSale, printReport: printReport,
+    openAdmin: openAdmin, adminTab: adminTab, handleImageUpload: handleImageUpload, handleLogoUpload: handleLogoUpload, clearLogo: clearLogo, saveItem: saveItem, cancelEdit: cancelEdit, deleteItem: deleteItem, moveItem: moveItem, saveMenuOrder: saveMenuOrder, editItem: editItem, addCategory: addCategory, deleteCategory: deleteCategory,
     openExpenses: openExpenses, saveExpense: saveExpense, editExpense: editExpense, deleteExpense: deleteExpense, cancelExpenseEdit: cancelExpenseEdit, renderExpenses: renderExpenses,
     openCalendar: openCalendar, changeMonth: changeMonth, showDayDetails: showDayDetails,
     closeModal: closeModal
