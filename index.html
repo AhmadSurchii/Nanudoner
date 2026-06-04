@@ -594,7 +594,7 @@ const firebaseConfig = {
   function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
 
     function loadData() {
-    state.logo = 'logo.png';
+    state.logo = 'logo.PNG';
 
 
     db.collection('menu').onSnapshot(function(snapshot) {
