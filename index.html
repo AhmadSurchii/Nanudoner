@@ -795,7 +795,7 @@ const firebaseConfig = {
     var d = new Date();
     var logoHtml = state.logo ? '<img src="' + state.logo + '" alt="Logo" class="receipt-logo">' : '';
     
-    document.getElementById('receipt-content').innerHTML = '<div class="receipt-header">' + logoHtml + '<div class="receipt-title">Nan u Döner</div><div class="receipt-sub">'+d.toLocaleDateString()+' '+d.toLocaleTimeString()+'</div></div>'
+    document.getElementById('receipt-content').innerHTML = '<div class="receipt-header">' + '<div class="receipt-title">Nan u Döner</div><div class="receipt-sub">'+d.toLocaleDateString()+' '+d.toLocaleTimeString()+'</div></div>'
       + '<hr class="receipt-divider">' + itemsH + '<hr class="receipt-divider"><div class="receipt-total-row"><span>TOTAL</span><span>'+fmt(sale.total)+'</span></div>' + changeH
       + '<div class="receipt-footer">Thank you for dining with us!</div>';
     
