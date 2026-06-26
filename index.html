@@ -813,21 +813,18 @@ const firebaseConfig = {
     if (!win) { showToast('Allow popups to print'); return; }
     
     // FIX: Adjusted the inline styles so the popup perfectly matches the 80mm printer paper width and kills all margins
-    win.document.write('<html><head><title>Receipt</title><style>'
+        win.document.write('<html><head><title>Receipt</title><style>'
       + '@page { size: 80mm auto; margin: 0; } '
-      + 'body{font-family:"Courier New", Courier, monospace;font-size:14px;padding:0;width:80mm;margin:0 auto;color:#000;}'
-      + '.receipt-row{display:flex;justify-content:space-between;padding:2px 0;}'
-      + '.receipt-total-row{display:flex;justify-content:space-between;font-weight:bold;font-size:16px;padding:4px 0;}'
-      + '.receipt-change-row{display:flex;justify-content:space-between;color:#000;font-weight:600;padding:2px 0;}'
-      + '.receipt-header{text-align:center;margin-bottom:12px;}'
-      + '.receipt-logo{width:48px;height:48px;object-fit:cover;border-radius:8px;margin-bottom:8px;}'
-      + '.receipt-title{font-size:18px;font-weight:700;}'
-      + '.receipt-sub{font-size:12px;color:#000;}'
-      + '.receipt-footer{text-align:center;margin-top:10px;font-size:12px;color:#000;}'
-      + 'hr{border:none;border-top:1px dashed #000;margin:8px 0;}'
+      + 'body { font-family: "Courier New", Courier, monospace; font-size: 14px; padding: 0 !important; width: 80mm; margin: 0 !important; color: #000; height: auto !important; }'
+      + '.receipt-header { text-align: center; margin-bottom: 12px; }'
+      + '.receipt-row { display: flex; justify-content: space-between; padding: 2px 0; }'
+      + '.receipt-total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; padding: 4px 0; }'
+      + 'hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }'
+      + '.receipt-footer { text-align: center; margin-top: 10px; font-size: 12px; color: #000; }'
       + '</style></head><body>'
       + '<div style="padding: 10px;">' + content + '</div>'
       + '</body></html>');
+
     win.document.close();
     win.focus();
     setTimeout(function(){ win.print(); win.close(); }, 300);
